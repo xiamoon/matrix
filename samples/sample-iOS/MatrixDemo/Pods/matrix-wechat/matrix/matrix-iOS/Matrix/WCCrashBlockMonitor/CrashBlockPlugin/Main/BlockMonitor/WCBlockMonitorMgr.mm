@@ -89,7 +89,7 @@ static struct timeval g_lastCheckTime;
 
 static BOOL g_bLaunchOver = NO;
 #if !TARGET_OS_OSX
-static BOOL g_bBackgroundLaunch = NO;
+static BOOL g_bBackgroundLaunch = NO; ///< ？
 #endif
 static BOOL g_bMonitor = NO;
 
@@ -129,6 +129,11 @@ float *kscrash_pointCpuHighThreadArrayCallBack(void) {
     BOOL m_bStop;
 
 #if !TARGET_OS_OSX
+    /*
+     UIApplicationStateActive, 在前台
+     UIApplicationStateInactive, 在前台时下拉通知栏、双击Home键、锁屏
+     UIApplicationStateBackground 应用退到后台：按home键到后台、在前台时启动其他应用
+     */
     UIApplicationState m_currentState;
 #endif
 
