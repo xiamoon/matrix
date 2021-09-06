@@ -21,9 +21,9 @@
 
 typedef NS_ENUM(NSUInteger, EFilterType) {
     EFilterType_None = 0,
-    EFilterType_Meaningless = 1, // the adress count of the stack is too little
-    EFilterType_Annealing = 2, // the Annealing algorithm, filter the continuous same stack
-    EFilterType_TrigerByTooMuch = 3, // filter the stack that appear too much one day
+    EFilterType_Meaningless = 1, // the adress count of the stack is too little：堆栈的地址计数太少
+    EFilterType_Annealing = 2, // the Annealing algorithm, filter the continuous same stack ：退火算法，过滤连续的同栈
+    EFilterType_TrigerByTooMuch = 3, // filter the stack that appear too much one day：过滤一天出现太多的堆栈
 };
 
 // Define the type of the lag

@@ -51,7 +51,7 @@ static useconds_t g_PerStackInterval = g_defaultPerStackInterval;
 static size_t g_StackMaxCount = 100;
 
 static NSUInteger g_CurrentThreadCount = 0;
-static BOOL g_MainThreadHandle = NO;
+static BOOL g_MainThreadHandle = NO; ///< 是否开启主线程句柄，是否处理主线程获取最近最耗时的栈
 static int g_MainThreadCount = 0;
 static KSStackCursor *g_PointMainThreadArray = NULL;
 static int *g_PointMainThreadRepeatCountArray = NULL;
@@ -59,10 +59,10 @@ static KSStackCursor **g_PointCPUHighThreadArray = NULL;
 static int g_PointCpuHighThreadCount = 0;
 static float *g_PointCpuHighThreadValueArray = NULL;
 
-static BOOL g_filterSameStack = NO;
+static BOOL g_filterSameStack = NO; ///< 是否过滤相同堆栈
 static uint32_t g_triggerdFilterSameCnt = 0;
 
-#define APP_SHOULD_SUSPEND 180 * BM_MicroFormat_Second
+#define APP_SHOULD_SUSPEND 180 * BM_MicroFormat_Second // 3 min
 
 #define PRINT_MEMORY_USE_INTERVAL 5
 
@@ -126,7 +126,7 @@ float *kscrash_pointCpuHighThreadArrayCallBack(void) {
 
 @interface WCBlockMonitorMgr () <WCPowerConsumeStackCollectorDelegate> {
     NSThread *m_monitorThread;
-    BOOL m_bStop;
+    BOOL m_bStop; ///< 是否停止了检测
 
 #if !TARGET_OS_OSX
     /*
@@ -454,12 +454,12 @@ float *kscrash_pointCpuHighThreadArrayCallBack(void) {
 - (void)threadProc {
     g_matrix_block_monitor_dumping_thread_id = pthread_mach_thread_np(pthread_self());
 
-    if (m_firstSleepTime) {
+    if (m_firstSleepTime) { // 先睡眠5s再检测
         sleep(m_firstSleepTime);
         m_firstSleepTime = 0;
     }
 
-    if (g_filterSameStack) {
+    if (g_filterSameStack) { // 是否过滤相同堆栈
         m_stackHandler = [[WCFilterStackHandler alloc] init];
     }
 
@@ -467,15 +467,15 @@ float *kscrash_pointCpuHighThreadArrayCallBack(void) {
         @autoreleasepool {
             if (g_bMonitor) {
                 EDumpType dumpType = [self check];
-                if (m_bStop) {
+                if (m_bStop) { // 已停止检测则break
                     break;
                 }
                 BM_SAFE_CALL_SELECTOR_NO_RETURN(_delegate,
                                                 @selector(onBlockMonitor:enterNextCheckWithDumpType:),
-                                                onBlockMonitor:self enterNextCheckWithDumpType:dumpType);
+                                                onBlockMonitor:self enterNextCheckWithDumpType:dumpType); // 通知代理人已进入下一次检测
                 if (dumpType != EDumpType_Unlag) {
                     if (EDumpType_BackgroundMainThreadBlock == dumpType || EDumpType_MainThreadBlock == dumpType) {
-                        if (g_CurrentThreadCount > 64) {
+                        if (g_CurrentThreadCount > 64) { // 线程数量大于64个
                             dumpType = EDumpType_BlockThreadTooMuch;
                             [self dumpFileWithType:dumpType];
                         } else {
@@ -528,7 +528,7 @@ float *kscrash_pointCpuHighThreadArrayCallBack(void) {
                     } else {
                         m_potenHandledLagFile = [self dumpFileWithType:dumpType];
                     }
-                } else {
+                } else { // 如果不需要dump，则重置状态
                     [self resetStatus];
                 }
             }
@@ -580,29 +580,29 @@ float *kscrash_pointCpuHighThreadArrayCallBack(void) {
     gettimeofday(&tvCur, NULL);
     unsigned long long diff = [WCBlockMonitorMgr diffTime:&tmp_g_tvRun endTime:&tvCur];
 
-#if TARGET_OS_OSX
-    BOOL tmp_g_bEventStart = g_eventStart;
-    struct timeval tmp_g_tvEvent = g_tvEvent;
-    unsigned long long eventDiff = [WCBlockMonitorMgr diffTime:&tmp_g_tvEvent endTime:&tvCur];
-#endif
+//#if TARGET_OS_OSX
+//    BOOL tmp_g_bEventStart = g_eventStart;
+//    struct timeval tmp_g_tvEvent = g_tvEvent;
+//    unsigned long long eventDiff = [WCBlockMonitorMgr diffTime:&tmp_g_tvEvent endTime:&tvCur];
+//#endif
 
-#if !TARGET_OS_OSX
+//#if !TARGET_OS_OSX
     struct timeval tmp_g_tvSuspend = g_tvSuspend;
-    if (__timercmp(&tmp_g_tvSuspend, &tmp_g_tvRun, >)) {
+    if (__timercmp(&tmp_g_tvSuspend, &tmp_g_tvRun, >)) { // 被终止时间大于运行时间
         MatrixInfo(@"suspend after run, filter");
         return EDumpType_Unlag;
     }
-#endif
+//#endif
 
     m_blockDiffTime = 0;
 
-    if (tmp_g_bRun && tmp_g_tvRun.tv_sec && tmp_g_tvRun.tv_usec && __timercmp(&tmp_g_tvRun, &tvCur, <) && diff > g_RunLoopTimeOut) {
+    if (tmp_g_bRun && tmp_g_tvRun.tv_sec && tmp_g_tvRun.tv_usec && __timercmp(&tmp_g_tvRun, &tvCur, <) && diff > g_RunLoopTimeOut) { // 主线程处理任务超时
         m_blockDiffTime = diff;
-#if TARGET_OS_OSX
-        MatrixInfo(@"check run loop time out %u bRun %d runloopActivity %lu block diff time %llu", g_RunLoopTimeOut, g_bRun, g_runLoopActivity, diff);
-#endif
+//#if TARGET_OS_OSX
+//        MatrixInfo(@"check run loop time out %u bRun %d runloopActivity %lu block diff time %llu", g_RunLoopTimeOut, g_bRun, g_runLoopActivity, diff);
+//#endif
 
-#if !TARGET_OS_OSX
+//#if !TARGET_OS_OSX
         MatrixInfo(@"check run loop time out %u %ld bRun %d runloopActivity %lu block diff time %llu",
                    g_RunLoopTimeOut,
                    (long)m_currentState,
@@ -615,10 +615,10 @@ float *kscrash_pointCpuHighThreadArrayCallBack(void) {
             return EDumpType_Unlag;
         }
 
-        if (m_currentState == UIApplicationStateBackground) {
+        if (m_currentState == UIApplicationStateBackground) { // 进入到后台造成的主线程卡顿
             if (g_enterBackground.tv_sec != 0 || g_enterBackground.tv_usec != 0) {
                 unsigned long long enterBackgroundTime = [WCBlockMonitorMgr diffTime:&g_enterBackground endTime:&tvCur];
-                if (__timercmp(&g_enterBackground, &tvCur, <) && (enterBackgroundTime > APP_SHOULD_SUSPEND)) {
+                if (__timercmp(&g_enterBackground, &tvCur, <) && (enterBackgroundTime > APP_SHOULD_SUSPEND)) { // 进入后台时间大于3 min则不作统计
                     MatrixInfo(@"may mistake block %lld", enterBackgroundTime);
                     return EDumpType_Unlag;
                 }
@@ -626,17 +626,17 @@ float *kscrash_pointCpuHighThreadArrayCallBack(void) {
 
             return EDumpType_BackgroundMainThreadBlock;
         }
-#endif
+//#endif
         return EDumpType_MainThreadBlock;
     }
 
-#if TARGET_OS_OSX
-    if (tmp_g_bEventStart && tmp_g_tvEvent.tv_sec && tmp_g_tvEvent.tv_usec && __timercmp(&tmp_g_tvEvent, &tvCur, <) && eventDiff > g_RunLoopTimeOut) {
-        m_blockDiffTime = eventDiff;
-        MatrixInfo(@"check event time out %u bRun %d", g_RunLoopTimeOut, g_eventStart);
-        return EDumpType_MainThreadBlock;
-    }
-#endif
+//#if TARGET_OS_OSX
+//    if (tmp_g_bEventStart && tmp_g_tvEvent.tv_sec && tmp_g_tvEvent.tv_usec && __timercmp(&tmp_g_tvEvent, &tvCur, <) && eventDiff > g_RunLoopTimeOut) {
+//        m_blockDiffTime = eventDiff;
+//        MatrixInfo(@"check event time out %u bRun %d", g_RunLoopTimeOut, g_eventStart);
+//        return EDumpType_MainThreadBlock;
+//    }
+//#endif
 
     // 2. cpu usage
 
