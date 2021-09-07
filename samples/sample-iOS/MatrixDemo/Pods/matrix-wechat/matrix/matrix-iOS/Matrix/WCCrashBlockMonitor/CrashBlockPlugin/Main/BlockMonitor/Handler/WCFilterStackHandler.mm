@@ -128,6 +128,7 @@
     });
 }
 
+// 添加，如果重复则返回重复次数
 - (NSUInteger)addStackFeat:(NSUInteger)stackFeat {
     if (_stackFeatPool == nil) {
         return 1;

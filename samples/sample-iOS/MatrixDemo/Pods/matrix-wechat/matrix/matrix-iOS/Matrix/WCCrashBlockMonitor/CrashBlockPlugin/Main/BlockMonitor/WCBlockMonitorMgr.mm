@@ -570,6 +570,7 @@ float *kscrash_pointCpuHighThreadArrayCallBack(void) {
     }
 }
 
+/// 先通过runloop检查是否是主线程卡顿，如果不是则检测cpu占用率，如果cpu占用率达到一定的阈值，则认为是cpu造成的卡顿
 - (EDumpType)check {
     // 1. runloop time out
 
@@ -698,16 +699,16 @@ float *kscrash_pointCpuHighThreadArrayCallBack(void) {
     BOOL bIsSame = NO;
     static std::vector<NSUInteger> vecCallStack(300);
     __block NSUInteger nSum = 0;
-    __block NSUInteger stackFeat = 0; // use the top stack address;
+    __block NSUInteger stackFeat = 0; // use the top stack address;  堆栈数组中第一个堆栈的符号地址 [[stackFeat, b, c], [d, e], [f, g, h]]
 
     if (g_MainThreadHandle) {
-        nSum = [m_pointMainThreadHandler getLastMainThreadStackCount];
-        uintptr_t *stack = [m_pointMainThreadHandler getLastMainThreadStack];
+        nSum = [m_pointMainThreadHandler getLastMainThreadStackCount]; // array.lastObject.count ，二维数组
+        uintptr_t *stack = [m_pointMainThreadHandler getLastMainThreadStack]; // array.lastObject
         if (stack) {
             for (size_t i = 0; i < nSum; i++) {
-                vecCallStack[i] = stack[i];
+                vecCallStack[i] = stack[i]; // 把stack copy到vecCallStack中
             }
-            stackFeat = kssymbolicate_symboladdress(stack[0]);
+            stackFeat = kssymbolicate_symboladdress(stack[0]); // 获取堆栈数组中第一个堆栈的符号地址
         } else {
             nSum = 0;
         }
@@ -728,6 +729,7 @@ float *kscrash_pointCpuHighThreadArrayCallBack(void) {
         return EFilterType_Meaningless;
     }
 
+    // 如果最近一次的stacks的个数跟上一次的一样，则拿出stacks中的每一个stack和上一次保存的进行对比，如果每个stack都一样，则认为是同一个stacks
     if (nSum == m_lastMainThreadStackCount) {
         NSUInteger index = 0;
         for (index = 0; index < nSum; index++) {
@@ -740,13 +742,13 @@ float *kscrash_pointCpuHighThreadArrayCallBack(void) {
         }
     }
 
-    if (bIsSame) {
+    if (bIsSame) { // 如果是本次和上次获取的是相同的堆栈数组，则使用退火算法延长检测时间
         NSUInteger lastTimeInterval = m_nIntervalTime;
         m_nIntervalTime = m_nLastTimeInterval + m_nIntervalTime;
         m_nLastTimeInterval = lastTimeInterval;
         MatrixInfo(@"call stack same timeinterval = %lu", (unsigned long)m_nIntervalTime);
         return EFilterType_Annealing;
-    } else {
+    } else { // 如果本次和上次的不同，则恢复默认检测时间。同时更新本地保存的上一次的stacks和stacks.count
         m_nIntervalTime = 1;
         m_nLastTimeInterval = 1;
 
@@ -759,7 +761,7 @@ float *kscrash_pointCpuHighThreadArrayCallBack(void) {
         }
 
         if (g_filterSameStack) {
-            NSUInteger repeatCnt = [m_stackHandler addStackFeat:stackFeat];
+            NSUInteger repeatCnt = [m_stackHandler addStackFeat:stackFeat]; // 获取重复次数
             if (repeatCnt > g_triggerdFilterSameCnt) {
                 MatrixInfo(@"call stack appear too much today, repeat conut:[%u]", (uint32_t)repeatCnt);
                 return EFilterType_TrigerByTooMuch;
